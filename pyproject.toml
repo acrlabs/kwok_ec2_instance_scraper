@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "ec2-instance-scraper"
+version = "0.1.0"
+description = ""
+authors = ["David Morrison <drmorr@appliedcomputing.io>"]
+package-mode = false
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+boto3 = "^1.34.51"
+simplejson = "^3.19.2"
+requests = "^2.32.0"
+arrow = "^1.3.0"
+ruamel-yaml = "^0.18.6"
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.8.0"
+boto3-stubs = {extras = ["ec2"], version = "^1.34.55"}
+types-simplejson = "^3.19.0.20240218"
+types-requests = "^2.31.0.20240218"
+flake8 = "^7.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
