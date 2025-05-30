@@ -13,14 +13,18 @@ from scraper.common import is_valid_usage_class
 from scraper.common import make_resource_map
 
 
-class EmptyDict(TypedDict):
-    pass
+class InstanceTypeRequirement(TypedDict):
+    key: str
+    operator: str
+    values: t.List[str]
 
 
 class InstanceTypeOffering(TypedDict):
     capacityType: str
     zone: str
     price: float
+    available: bool
+    requirements: t.List[InstanceTypeRequirement]
 
 
 class InstanceTypeOptions(TypedDict):
@@ -38,19 +42,33 @@ class InstanceTypeOptionsList:
         self.ondemand_prices = fetch_ondemand_prices(aws_region)
         self.spot_prices = fetch_spot_prices(ec2)
 
-    def add_instance_types(self, instance_type: InstanceTypeInfoTypeDef, zones: t.List[str], disable_spot: bool) -> None:
-        self.nodes.extend([
-            InstanceTypeOptions(
-                name=instance_type["InstanceType"],
-                offerings=make_offerings(instance_type, zones, self.ondemand_prices, self.spot_prices, disable_spot),
-                architecture=convert_arch(arch),
-                operatingSystems=[
-                    "linux",
-                ],
-                resources=make_resource_map(instance_type),
-            )
-            for arch in instance_type["ProcessorInfo"]["SupportedArchitectures"] if arch in {"x86_64", "arm64"}
-        ])
+    def add_instance_types(
+        self,
+        instance_type: InstanceTypeInfoTypeDef,
+        zones: t.List[str],
+        disable_spot: bool,
+    ) -> None:
+        self.nodes.extend(
+            [
+                InstanceTypeOptions(
+                    name=instance_type["InstanceType"],
+                    offerings=make_offerings(
+                        instance_type,
+                        zones,
+                        self.ondemand_prices,
+                        self.spot_prices,
+                        disable_spot,
+                    ),
+                    architecture=convert_arch(arch),
+                    operatingSystems=[
+                        "linux",
+                    ],
+                    resources=make_resource_map(instance_type),
+                )
+                for arch in instance_type["ProcessorInfo"]["SupportedArchitectures"]
+                if arch in {"x86_64", "arm64"}
+            ]
+        )
 
     def serialize(self, writer: t.IO[str]):
         json.dump(self.nodes, writer)
@@ -66,17 +84,26 @@ def make_offerings(
     name = instance_type["InstanceType"]
     offerings = [
         InstanceTypeOffering(
-            capacityType=cl,
-            zone=z,
+            available=True,
+            requirements=[
+                InstanceTypeRequirement(
+                    key="topology.kubernetes.io/zone",
+                    operator="In",
+                    values=[z],
+                ),
+                InstanceTypeRequirement(
+                    key="karpenter.sh/capacity-type",
+                    operator="In",
+                    values=[cl],
+                ),
+            ],
             price=(
-                ondemand_prices[name]
-                if cl == "on-demand"
-                else spot_prices[(name, z)]
+                ondemand_prices[name] if cl == "on-demand" else spot_prices[(name, z)]
             ),
         )
         for z in zones
-        for cl in instance_type["SupportedUsageClasses"] if
-            is_valid_usage_class(cl, name, z, spot_prices.keys(), disable_spot) # noqa
+        for cl in instance_type["SupportedUsageClasses"]
+        if is_valid_usage_class(cl, name, z, spot_prices.keys(), disable_spot)  # noqa
     ]
 
     return offerings
