@@ -5,9 +5,8 @@ import boto3
 from typing_extensions import TypedDict
 
 from scraper.ca import KwokNodeList
-from scraper.karpenter import InstanceTypeOptionsList
-
 from scraper.common import fetch_instance_types
+from scraper.karpenter import InstanceTypeOptionsList
 
 
 class Filter(TypedDict):
@@ -43,9 +42,9 @@ def parse_args() -> argparse.Namespace:
 
     root_parser.add_argument("--zones", default=list(), type=lambda s: s.split(","))
 
-    root_parser.add_argument("--min-cpu", type=int)
+    root_parser.add_argument("--min-cpu", type=int, default=0)
 
-    root_parser.add_argument("--max-cpu", type=int)
+    root_parser.add_argument("--max-cpu", type=int, default=float("inf"))
 
     root_parser.add_argument(
         "--capacity-type",
@@ -81,11 +80,6 @@ def run() -> None:
     if args.instance_families and args.instance_types:
         raise ValueError(
             "Instance_families and instance_types are mutually exclusive options"
-        )
-
-    if args.instance_families and not (args.min_cpu and args.max_cpu):
-        raise ValueError(
-            "If instance families are provided a valid min_cpu and max_cpu must be provided"
         )
 
     builder: t.Union[InstanceTypeOptionsList, KwokNodeList]
